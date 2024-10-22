@@ -4,9 +4,28 @@ import pdfplumber
 from docx import Document
 import pandas as pd
 import requests
+import os
+import logging
+from dotenv import load_dotenv
 
-# Set your OpenAI API key here (replace with environment variables in production)
-openai.api_key = 'sk-GG-7tTWL9Omh8bpbp4PHnEeIiugnYnWxOfOoV20iHGT3BlbkFJ-hkJetHOyh6OCTFuf1FJ10hWSW6_jdeVYLvUCkWvEA'
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+
+# Load environment variables from .env file
+load_dotenv()
+
+# OpenAI API Key
+openai_api_key = os.getenv("OPENAI_API_KEY")
+
+# Debugging: Check if API key is loaded
+if openai_api_key:
+    st.write("API Key loaded successfully.")
+    openai.api_key = openai_api_key
+else:
+    st.error("Error: API Key not loaded. Please check your .env file or set the key manually.")
+
+# Optionally, hardcode the API key for testing
+# openai.api_key = "your_openai_api_key_here"
 
 # Function to extract text from PDF using pdfplumber
 def extract_text_from_pdf(file):
@@ -26,37 +45,43 @@ def extract_text_from_docx(file):
 
 # Function to interact with GPT-3.5-turbo to dynamically extract information
 def extract_dynamic_info_from_document(document_text, dynamic_query):
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {
-                "role": "system",
-                "content": "You are an assistant that dynamically extracts specific details from ordinance documents based on user input."
-            },
-            {
-                "role": "user",
-                "content": f"Based on the following document, please extract relevant information related to: {dynamic_query}.\n\nDocument:\n{document_text}"
-            }
-        ],
-        max_tokens=1500,
-        temperature=0.2
-    )
-    return response['choices'][0]['message']['content'].strip()
+    try:
+        logging.info(f"Extracting information for query: {dynamic_query}")
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are an assistant that dynamically extracts specific details from ordinance documents based on user input."
+                },
+                {
+                    "role": "user",
+                    "content": f"Based on the following document, please extract relevant information related to: {dynamic_query}.\n\nDocument:\n{document_text}"
+                }
+            ],
+            max_tokens=1500,
+            temperature=0.2
+        )
+        return response['choices'][0]['message']['content'].strip()
+    except Exception as e:
+        logging.error(f"Error with OpenAI API request: {e}")
+        st.error(f"Error with OpenAI API request: {e}")
+        return ""
 
 # Load the OEDI dataset for county ordinances
 @st.cache_data
 def load_oedi_data():
-    return pd.read_csv(r'C:\Users\SundeepYalamanchili\Documents\Ordinance\Solar Ordinance.csv')
+    return pd.read_csv('Solar Ordinance.csv')
 
 # Load the Municode dataset (separate from OEDI)
 @st.cache_data
 def load_municode_data():
-    return pd.read_csv(r'C:\Users\SundeepYalamanchili\Documents\Ordinance\municode.csv')
+    return pd.read_csv('municode.csv')
 
 # Load the ALP dataset (states, counties, and their URLs)
 @st.cache_data
 def load_alp_data():
-    return pd.read_csv(r'C:\Users\SundeepYalamanchili\Documents\Ordinance\alp_links.csv')
+    return pd.read_csv('alp_links.csv')
 
 # Function to convert a name to the proper URL format (lowercase and replace spaces with underscores)
 def format_name_for_url(name):
@@ -90,13 +115,14 @@ if uploaded_file is not None:
     # Extract text based on file type
     file_type = uploaded_file.name.split('.')[-1].lower()
     
-    if file_type == 'pdf':
-        ordinance_text = extract_text_from_pdf(uploaded_file)
-    elif file_type == 'docx':
-        ordinance_text = extract_text_from_docx(uploaded_file)
-    else:
-        st.error("Unsupported file format!")
-        ordinance_text = ""
+    with st.spinner("Extracting document text..."):
+        if file_type == 'pdf':
+            ordinance_text = extract_text_from_pdf(uploaded_file)
+        elif file_type == 'docx':
+            ordinance_text = extract_text_from_docx(uploaded_file)
+        else:
+            st.error("Unsupported file format!")
+            ordinance_text = ""
 
     if ordinance_text:
         # Display extracted text (optional)
@@ -108,7 +134,8 @@ if uploaded_file is not None:
 
         if dynamic_query:
             # Extract relevant information based on dynamic query
-            extracted_info = extract_dynamic_info_from_document(ordinance_text, dynamic_query)
+            with st.spinner("Extracting information from the document..."):
+                extracted_info = extract_dynamic_info_from_document(ordinance_text, dynamic_query)
             st.subheader(f"Extracted Information for: {dynamic_query}")
             st.write(extracted_info)
 
@@ -189,7 +216,6 @@ if st.session_state['active_section'] == 'oedi':
     if not county_data_oedi.empty:
         st.subheader(f"Solar Ordinance for {selected_county_oedi}, {selected_state_oedi}")
         for _, row in county_data_oedi.iterrows():
-            # Only display relevant fields (without 'Feature Type', 'Value', 'Value Type')
             st.write(f"**Citation**: {row['Citation']}")
             st.write(f"**Comment**: {row['Comment']}")
             st.write(f"**Ordinance Year**: {row['Ordinance Year']}")
@@ -207,7 +233,7 @@ elif st.session_state['active_section'] == 'municode':
     # Select state
     selected_state_municode = st.selectbox(
         "Select a State (Municode)",
-        data_municode['State Name'].unique(),  # Use the exact format from the dataset
+        data_municode['State Name'].unique(),
         index=list(data_municode['State Name'].unique()).index(st.session_state['selected_state_municode'])
         if st.session_state['selected_state_municode'] else 0
     )
@@ -238,8 +264,6 @@ elif st.session_state['active_section'] == 'municode':
         if county_exists_on_municode(st.session_state['selected_state_municode'].lower(), st.session_state['selected_county_municode'].lower()):
             county_url = construct_county_url(st.session_state['selected_state_municode'].lower(), st.session_state['selected_county_municode'].lower())
             st.write(f"Displaying the page for: {county_url}")
-            
-            # Display the county page in an iframe
             st.components.v1.iframe(county_url, height=600, scrolling=True)
         else:
             st.write(f"Selected county '{st.session_state['selected_county_municode']}' is not available on Municode.")
@@ -286,19 +310,10 @@ elif st.session_state['active_section'] == 'alp':
     ]
 
     if not county_data_alp.empty:
-        # Fetch the URL from the dataset
         alp_url = county_data_alp.iloc[0]['URL']
-
-        # Debugging: Log the URL to see if it's being fetched correctly
         st.write(f"Fetched URL: {alp_url}")
-
-        # Display the ALP ordinance
         st.subheader(f"ALP Ordinance for {selected_county_alp}, {selected_state_alp}")
-        
-        # Display the link as a clickable hyperlink
         st.markdown(f"Visit the ordinance page: [Click here]({alp_url})", unsafe_allow_html=True)
-        
-        # Optionally, embed the page in an iframe
         st.components.v1.iframe(alp_url, height=600, scrolling=True)
     else:
         st.write(f"No ALP ordinances found for {selected_county_alp}, {selected_state_alp}.")
