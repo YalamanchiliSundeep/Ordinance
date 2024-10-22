@@ -1,0 +1,8 @@
+openai
+python-dotenv
+streamlit
+pdfplumber
+python-docx
+pandas
+requests
+
