@@ -47,7 +47,7 @@ def extract_text_from_docx(file):
 def extract_dynamic_info_from_document(document_text, dynamic_query):
     try:
         logging.info(f"Extracting information for query: {dynamic_query}")
-        response = openai.ChatCompletion.create(
+        response = openai.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {
