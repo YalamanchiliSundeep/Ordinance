@@ -10,4 +10,4 @@ Municode
 ALP (American Legal Publishing)
 
 ## License
-This project is licensed under Balanced Rock Power.
+This software is proprietary and licensed for internal use only by Balanced Rock Power. For more details, refer to the LICENSE.md file in this repository. Unauthorized distribution or use outside of Balanced Rock Power is strictly prohibited.
