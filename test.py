@@ -14,18 +14,14 @@ logging.basicConfig(level=logging.INFO)
 # Load environment variables from .env file
 load_dotenv()
 
-# OpenAI API Key
-openai_api_key = os.getenv("OPENAI_API_KEY")
+# Initialize the OpenAI client
+client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Debugging: Check if API key is loaded
-if openai_api_key:
+if client.api_key:
     st.write("API Key loaded successfully.")
-    openai.api_key = openai_api_key
 else:
     st.error("Error: API Key not loaded. Please check your .env file or set the key manually.")
-
-# Optionally, hardcode the API key for testing
-# openai.api_key = "your_openai_api_key_here"
 
 # Function to extract text from PDF using pdfplumber
 def extract_text_from_pdf(file):
@@ -47,7 +43,7 @@ def extract_text_from_docx(file):
 def extract_dynamic_info_from_document(document_text, dynamic_query):
     try:
         logging.info(f"Extracting information for query: {dynamic_query}")
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {
@@ -62,7 +58,7 @@ def extract_dynamic_info_from_document(document_text, dynamic_query):
             max_tokens=1500,
             temperature=0.2
         )
-        return response['choices'][0]['message']['content'].strip()
+        return response.choices[0].message.content.strip()
     except Exception as e:
         logging.error(f"Error with OpenAI API request: {e}")
         st.error(f"Error with OpenAI API request: {e}")
