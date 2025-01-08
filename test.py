@@ -2,8 +2,6 @@ import streamlit as st
 import openai
 import pdfplumber
 from docx import Document
-import pandas as pd
-import requests
 import os
 import logging
 from dotenv import load_dotenv
@@ -39,9 +37,14 @@ def extract_text_from_docx(file):
         full_text.append(para.text)
     return "\n".join(full_text)
 
-# Function to interact with GPT-3.5-turbo to dynamically extract information
+# Function to dynamically extract information with truncation logic
 def extract_dynamic_info_from_document(document_text, dynamic_query):
     try:
+        # Truncate document text to fit within token limits
+        MAX_TEXT_LENGTH = 10000  # Leave room for query and response
+        if len(document_text) > MAX_TEXT_LENGTH:
+            document_text = document_text[:MAX_TEXT_LENGTH]
+
         logging.info(f"Extracting information for query: {dynamic_query}")
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
@@ -55,7 +58,7 @@ def extract_dynamic_info_from_document(document_text, dynamic_query):
                     "content": f"Based on the following document, please extract relevant information related to: {dynamic_query}.\n\nDocument:\n{document_text}"
                 }
             ],
-            max_tokens=1500,
+            max_tokens=1000,  # Adjust to fit within token limit
             temperature=0.2
         )
         return response.choices[0].message.content.strip()
@@ -64,46 +67,7 @@ def extract_dynamic_info_from_document(document_text, dynamic_query):
         st.error(f"Error with OpenAI API request: {e}")
         return ""
 
-# Load the OEDI dataset for county ordinances
-@st.cache_data
-def load_oedi_data():
-    return pd.read_csv('Solar Ordinance.csv')
-
-# Load the Municode dataset (separate from OEDI)
-@st.cache_data
-def load_municode_data():
-    return pd.read_csv('municode.csv')
-
-# Load the ALP dataset (states, counties, and their URLs)
-@st.cache_data
-def load_alp_data():
-    return pd.read_csv('alp_links.csv')
-
-# Function to convert a name to the proper URL format (lowercase and replace spaces with underscores)
-def format_name_for_url(name):
-    return name.strip().lower().replace(" ", "_")
-
-# Function to construct the Municode URL for the selected state and county
-def construct_county_url(state_id, county_name):
-    formatted_county = format_name_for_url(county_name)
-    return f"https://library.municode.com/{state_id}/{formatted_county}"
-
-# Function to check if the county exists on Municode
-def county_exists_on_municode(state_id, county_name):
-    county_url = construct_county_url(state_id, county_name)
-    try:
-        response = requests.get(county_url)
-        if response.status_code == 200:
-            return True
-        else:
-            return False
-    except Exception as e:
-        return False
-
-# Streamlit UI
-st.title("Solar Ordinance Processor and Search")
-
-# --- File Upload Section for Ordinance Document Processing ---
+# Streamlit UI for document processing
 st.header("Upload Your Ordinance Document")
 uploaded_file = st.file_uploader("Upload a PDF or DOCX ordinance document", type=["pdf", "docx"])
 
@@ -138,10 +102,10 @@ if uploaded_file is not None:
             # Store the extracted information in the session state for later use
             st.session_state['extracted_info'] = extracted_info
     else:
-        # Notify the user if no text was extracted
         st.warning("Text extraction failed. Please check the uploaded document.")
 else:
     st.info("Please upload a PDF or DOCX ordinance document to proceed.")
+
 
 # --- OEDI Dataset Ordinance Search Section ---
 if 'active_section' not in st.session_state:
