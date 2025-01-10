@@ -183,6 +183,9 @@ if st.session_state['active_section'] == 'oedi':
     else:
         st.write(f"No solar ordinances found for {selected_county_oedi}, {selected_state_oedi}.")
 
+
+
+
 # --- Municode Section ---
 elif st.session_state['active_section'] == 'municode':
     st.header("Check Available Ordinances from Municode")
@@ -190,43 +193,62 @@ elif st.session_state['active_section'] == 'municode':
     # Load Municode data
     data_municode = load_municode_data()
 
+    # Ensure 'State' and 'County' columns exist in the dataset
+    if 'State' not in data_municode.columns or 'County' not in data_municode.columns:
+        st.error("The Municode dataset must have 'State' and 'County' columns.")
+        st.stop()
+
+    # Initialize session state variables if they do not exist
+    if 'selected_state_municode' not in st.session_state:
+        st.session_state['selected_state_municode'] = None
+    if 'selected_county_municode' not in st.session_state:
+        st.session_state['selected_county_municode'] = None
+
+    # Get unique states
+    states = sorted(data_municode['State'].dropna().unique())
+
     # Select state
     selected_state_municode = st.selectbox(
-        "Select a State (Municode)",
-        data_municode['State Name'].unique(),
-        index=list(data_municode['State Name'].unique()).index(st.session_state['selected_state_municode'])
-        if st.session_state['selected_state_municode'] else 0
+        "Select a State",
+        states,
+        index=states.index(st.session_state['selected_state_municode'])
+        if st.session_state['selected_state_municode'] in states else 0
     )
-
-    # If the selected state changes, reset the selected county
-    if selected_state_municode != st.session_state['selected_state_municode']:
-        st.session_state['selected_county_municode'] = None
 
     # Update session state for state
     st.session_state['selected_state_municode'] = selected_state_municode
 
     # Filter counties based on the selected state
-    filtered_counties_municode = data_municode[data_municode['State Name'] == selected_state_municode]['County'].dropna().unique()
+    filtered_counties = sorted(data_municode[data_municode['State'] == selected_state_municode]['County'].dropna().unique())
+
+    # Handle case where no counties are found
+    if not filtered_counties:
+        st.warning(f"No counties found for the state: {selected_state_municode}. Please select another state.")
+        st.stop()
 
     # Select county
     selected_county_municode = st.selectbox(
         "Select a County",
-        filtered_counties_municode,
-        index=list(filtered_counties_municode).index(st.session_state['selected_county_municode'])
-        if st.session_state['selected_county_municode'] else 0
+        filtered_counties,
+        index=filtered_counties.index(st.session_state['selected_county_municode'])
+        if st.session_state['selected_county_municode'] in filtered_counties else 0
     )
 
     # Update session state for county
     st.session_state['selected_county_municode'] = selected_county_municode
 
-    # Check if the selected county exists on Municode
-    if st.button("Check Availability and Show Page"):
-        if county_exists_on_municode(st.session_state['selected_state_municode'].lower(), st.session_state['selected_county_municode'].lower()):
-            county_url = construct_county_url(st.session_state['selected_state_municode'].lower(), st.session_state['selected_county_municode'].lower())
-            st.write(f"Displaying the page for: {county_url}")
-            st.components.v1.iframe(county_url, height=600, scrolling=True)
-        else:
-            st.write(f"Selected county '{st.session_state['selected_county_municode']}' is not available on Municode.")
+    # Function to construct the Municode URL
+    def construct_municode_url(state_name, county_name):
+        state_short_name = state_name[:2].lower()  # Use the first two characters of the state name
+        formatted_county = county_name.replace(" ", "_").lower()  # Replace spaces with underscores and convert to lowercase
+        return f"https://library.municode.com/{state_short_name}/{formatted_county}"
+
+    # Generate and display the link
+    if st.button("Generate Link"):
+        county_url = construct_municode_url(selected_state_municode, selected_county_municode)
+        st.subheader(f"Municode Ordinance for {selected_county_municode}, {selected_state_municode}")
+        st.markdown(f"Visit the ordinance page: [Click here]({county_url})", unsafe_allow_html=True)
+
 
 # --- ALP Section ---
 elif st.session_state['active_section'] == 'alp':
