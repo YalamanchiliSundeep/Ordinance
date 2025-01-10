@@ -21,6 +21,35 @@ if client.api_key:
 else:
     st.error("Error: API Key not loaded. Please check your .env file or set the key manually.")
 
+
+# Functions to load datasets
+def load_oedi_data():
+    try:
+        dataset_path = './OEDI Dataset.csv'
+        logging.info(f"Loading OEDI dataset from {os.path.abspath(dataset_path)}")
+        return pd.read_csv(dataset_path)
+    except FileNotFoundError:
+        st.error("OEDI dataset file not found. Please ensure it is in the same directory as the script.")
+        return pd.DataFrame()
+
+def load_municode_data():
+    try:
+        dataset_path = './municode.csv'
+        logging.info(f"Loading Municode dataset from {os.path.abspath(dataset_path)}")
+        return pd.read_csv(dataset_path)
+    except FileNotFoundError:
+        st.error("Municode dataset file not found. Please ensure it is in the same directory as the script.")
+        return pd.DataFrame()
+
+def load_alp_data():
+    try:
+        dataset_path = './alp_links.csv'
+        logging.info(f"Loading ALP dataset from {os.path.abspath(dataset_path)}")
+        return pd.read_csv(dataset_path)
+    except FileNotFoundError:
+        st.error("ALP dataset file not found. Please ensure it is in the same directory as the script.")
+        return pd.DataFrame()
+        
 # Function to extract text from PDF using pdfplumber
 def extract_text_from_pdf(file):
     with pdfplumber.open(file) as pdf:
