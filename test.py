@@ -1,6 +1,7 @@
 import streamlit as st
 import openai
 import pdfplumber
+import pandas as pd
 from docx import Document
 import os
 import logging
